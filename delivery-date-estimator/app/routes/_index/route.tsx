@@ -21,34 +21,35 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
+        <h1 className={styles.heading}>Delivery Date Estimator & Countdown</h1>
         <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
+          Show accurate delivery dates and urgency countdowns on product pages
+          to increase conversion and reduce pre-sale shipping questions.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
             <label className={styles.label}>
               <span>Shop domain</span>
               <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
+              <span>Example: your-store.myshopify.com</span>
             </label>
             <button className={styles.button} type="submit">
-              Log in
+              Open Admin App
             </button>
           </Form>
         )}
         <ul className={styles.list}>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Reliable dates.</strong> Configure cutoff time, processing
+            days, shipping range, and holidays in minutes.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Urgency timer.</strong> Show Order within countdown copy
+            that updates every second before cutoff.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Theme friendly.</strong> Add as a product block in Theme
+            Editor with no custom theme code.
           </li>
         </ul>
       </div>
