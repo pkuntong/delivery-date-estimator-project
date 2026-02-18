@@ -9,7 +9,6 @@
   4. In your dev store: Online Store → Customize → Product page → Add block → Delivery Date Estimator
 {% endcomment %}
 
-{% assign now = 'now' | date: '%s' | times: 1 %}
 {% assign cutoff_hour = block.settings.cutoff_hour | default: 14 %}
 {% assign processing_days = block.settings.processing_days | default: 1 %}
 {% assign shipping_min = block.settings.shipping_days_min | default: 3 %}
@@ -70,15 +69,15 @@
 
   <div class="de-content">
     <div class="de-delivery-line">
-      <span class="de-label">{{ block.settings.label_text | default: 'Estimated delivery' }}:</span>
+      <span class="de-label" id="de-label-{{ block.id }}">{{ block.settings.label_text | default: 'Estimated delivery' }}:</span>
       <span class="de-date" id="de-date-{{ block.id }}"></span>
     </div>
 
     {% if show_countdown %}
       <div class="de-countdown-line" id="de-countdown-wrap-{{ block.id }}">
-        <span class="de-countdown-label">{{ block.settings.countdown_text | default: 'Order within' }}</span>
+        <span class="de-countdown-label" id="de-countdown-label-{{ block.id }}">{{ block.settings.countdown_text | default: 'Order within' }}</span>
         <span class="de-countdown" id="de-countdown-{{ block.id }}"></span>
-        <span class="de-countdown-suffix">{{ block.settings.countdown_suffix | default: 'to get it by' }}
+        <span class="de-countdown-suffix"><span id="de-countdown-suffix-text-{{ block.id }}">{{ block.settings.countdown_suffix | default: 'to get it by' }}</span>
           <strong id="de-countdown-target-{{ block.id }}"></strong>
         </span>
       </div>
@@ -178,13 +177,215 @@
       excludeWeekends: block.dataset.excludeWeekends === 'true',
       showCountdown: block.dataset.showCountdown === 'true',
       holidays: (block.dataset.holidays || '').split(',').filter(Boolean),
-      timezone: block.dataset.timezone || 'America/New_York'
+      timezone: block.dataset.timezone || 'America/New_York',
+      labelTextA: 'Estimated delivery',
+      countdownTextA: 'Order within',
+      countdownSuffixA: 'to get it by',
+      abTestEnabled: false,
+      abTestSplit: 50,
+      labelTextVariantB: '',
+      countdownTextVariantB: '',
+      countdownSuffixVariantB: ''
     };
 
     const dateEl = document.getElementById('de-date-{{ block.id }}');
     const countdownEl = document.getElementById('de-countdown-{{ block.id }}');
     const countdownWrapEl = document.getElementById('de-countdown-wrap-{{ block.id }}');
+    const labelEl = document.getElementById('de-label-{{ block.id }}');
+    const countdownLabelEl = document.getElementById('de-countdown-label-{{ block.id }}');
+    const countdownSuffixTextEl = document.getElementById('de-countdown-suffix-text-{{ block.id }}');
     const countdownTargetEl = document.getElementById('de-countdown-target-{{ block.id }}');
+    const clientIdKey = 'dde_client_id_v1';
+    let intervalId = null;
+    let currentVariant = 'a';
+    let impressionTracked = false;
+    let abExposureTracked = false;
+
+    config.labelTextA = labelEl
+      ? labelEl.textContent.replace(/:\s*$/, '').trim() || config.labelTextA
+      : config.labelTextA;
+    config.countdownTextA = countdownLabelEl
+      ? countdownLabelEl.textContent.trim() || config.countdownTextA
+      : config.countdownTextA;
+    config.countdownSuffixA = countdownSuffixTextEl
+      ? countdownSuffixTextEl.textContent.trim() || config.countdownSuffixA
+      : config.countdownSuffixA;
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function toNonEmptyString(value, fallback) {
+      if (typeof value !== 'string') return fallback;
+      const normalized = value.trim();
+      return normalized || fallback;
+    }
+
+    function toOptionalString(value) {
+      if (typeof value !== 'string') return '';
+      return value.trim();
+    }
+
+    function setText(el, value, appendColon) {
+      if (!el) return;
+      el.textContent = appendColon ? value + ':' : value;
+    }
+
+    function ensureClientId() {
+      try {
+        const existing = localStorage.getItem(clientIdKey);
+        if (existing) return existing;
+        const created = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem(clientIdKey, created);
+        return created;
+      } catch (error) {
+        return Math.random().toString(36).slice(2);
+      }
+    }
+
+    function hashToPercent(value) {
+      let hash = 0;
+      for (let i = 0; i < value.length; i += 1) {
+        hash = (hash * 31 + value.charCodeAt(i)) | 0;
+      }
+      return Math.abs(hash) % 100;
+    }
+
+    function isAbActive() {
+      return Boolean(
+        config.abTestEnabled &&
+          (
+            config.labelTextVariantB ||
+            config.countdownTextVariantB ||
+            config.countdownSuffixVariantB
+          )
+      );
+    }
+
+    function assignVariant() {
+      if (!isAbActive()) {
+        currentVariant = 'a';
+        return;
+      }
+      const split = clamp(config.abTestSplit, 10, 90);
+      const bucket = hashToPercent(ensureClientId());
+      currentVariant = bucket < split ? 'a' : 'b';
+    }
+
+    function applyCopyVariant() {
+      assignVariant();
+      const useVariantB = currentVariant === 'b' && isAbActive();
+      const label = useVariantB && config.labelTextVariantB
+        ? config.labelTextVariantB
+        : config.labelTextA;
+      const countdown = useVariantB && config.countdownTextVariantB
+        ? config.countdownTextVariantB
+        : config.countdownTextA;
+      const suffix = useVariantB && config.countdownSuffixVariantB
+        ? config.countdownSuffixVariantB
+        : config.countdownSuffixA;
+
+      setText(labelEl, label, true);
+      setText(countdownLabelEl, countdown, false);
+      setText(countdownSuffixTextEl, suffix, false);
+    }
+
+    function trackEvent(event, includeVariant) {
+      const payload = {
+        event: event,
+        variant: includeVariant ? currentVariant : undefined
+      };
+
+      const url = '/apps/delivery-date-estimator/event?source=theme_block';
+      const body = JSON.stringify(payload);
+
+      if (navigator.sendBeacon) {
+        const sent = navigator.sendBeacon(
+          url,
+          new Blob([body], { type: 'application/json' })
+        );
+        if (sent) return;
+      }
+
+      fetch(url, {
+        method: 'POST',
+        credentials: 'omit',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/json' },
+        body
+      }).catch(function() {
+        // Ignore tracking failures.
+      });
+    }
+
+    function applyRemoteConfig(remote) {
+      if (!remote || typeof remote !== 'object') return;
+
+      const intOr = (value, fallback) => {
+        const parsed = parseInt(value, 10);
+        return Number.isFinite(parsed) ? parsed : fallback;
+      };
+
+      config.cutoffHour = intOr(remote.cutoffHour, config.cutoffHour);
+      config.processingDays = intOr(remote.processingDays, config.processingDays);
+      config.shippingMin = intOr(remote.shippingDaysMin, config.shippingMin);
+      config.shippingMax = intOr(remote.shippingDaysMax, config.shippingMax);
+      config.fontSize = intOr(remote.fontSize, parseInt(getComputedStyle(block).fontSize, 10) || 14);
+      config.excludeWeekends = typeof remote.excludeWeekends === 'boolean'
+        ? remote.excludeWeekends
+        : config.excludeWeekends;
+      config.showCountdown = typeof remote.showCountdown === 'boolean'
+        ? remote.showCountdown
+        : config.showCountdown;
+      config.timezone = typeof remote.timezone === 'string' && remote.timezone
+        ? remote.timezone
+        : config.timezone;
+      config.holidays = Array.isArray(remote.holidays)
+        ? remote.holidays.filter((entry) => typeof entry === 'string')
+        : config.holidays;
+      config.labelTextA = toNonEmptyString(remote.labelText, config.labelTextA);
+      config.countdownTextA = toNonEmptyString(remote.countdownText, config.countdownTextA);
+      config.countdownSuffixA = toNonEmptyString(remote.countdownSuffix, config.countdownSuffixA);
+      config.abTestEnabled = Boolean(remote.abTestEnabled);
+      config.abTestSplit = clamp(intOr(remote.abTestSplit, config.abTestSplit), 10, 90);
+      config.labelTextVariantB = toOptionalString(remote.labelTextVariantB);
+      config.countdownTextVariantB = toOptionalString(remote.countdownTextVariantB);
+      config.countdownSuffixVariantB = toOptionalString(remote.countdownSuffixVariantB);
+
+      applyCopyVariant();
+
+      if (typeof remote.textColor === 'string' && remote.textColor) {
+        block.style.setProperty('--de-text-color', remote.textColor);
+      }
+      if (typeof remote.backgroundColor === 'string' && remote.backgroundColor) {
+        block.style.setProperty('--de-bg-color', remote.backgroundColor);
+      }
+      if (typeof remote.borderColor === 'string' && remote.borderColor) {
+        block.style.setProperty('--de-border-color', remote.borderColor);
+      }
+      if (typeof remote.urgencyColor === 'string' && remote.urgencyColor) {
+        block.style.setProperty('--de-urgency-color', remote.urgencyColor);
+      }
+      if (Number.isFinite(config.fontSize)) {
+        block.style.setProperty('--de-font-size', config.fontSize + 'px');
+      }
+    }
+
+    async function loadRemoteConfig() {
+      try {
+        const response = await fetch('/apps/delivery-date-estimator/config?source=theme_block', {
+          method: 'GET',
+          credentials: 'omit',
+          headers: { Accept: 'application/json' }
+        });
+
+        if (!response.ok) return;
+        const remote = await response.json();
+        applyRemoteConfig(remote);
+      } catch (error) {
+        // Fall back to block defaults when proxy is unavailable.
+      }
+    }
 
     function getNow() {
       return new Date(new Date().toLocaleString('en-US', { timeZone: config.timezone }));
@@ -273,14 +474,37 @@
         countdownWrapEl.style.display = 'none';
       }
 
-      block.classList.add('de-ready');
+      if (!block.classList.contains('de-ready')) {
+        block.classList.add('de-ready');
+      }
     }
 
-    calculate();
+    function restartInterval() {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
 
-    if (config.showCountdown) {
-      setInterval(calculate, 1000);
+      if (config.showCountdown) {
+        intervalId = setInterval(calculate, 1000);
+      }
     }
+
+    loadRemoteConfig().finally(() => {
+      applyCopyVariant();
+      calculate();
+      restartInterval();
+
+      if (!impressionTracked) {
+        trackEvent('widget_impression', isAbActive());
+        impressionTracked = true;
+      }
+
+      if (isAbActive() && !abExposureTracked) {
+        trackEvent('ab_variant_exposed', true);
+        abExposureTracked = true;
+      }
+    });
   })();
 </script>
 
@@ -348,8 +572,7 @@
       "type": "text",
       "id": "holidays",
       "label": "Holiday dates (comma-separated)",
-      "info": "Format: YYYY-MM-DD. Example: 2026-12-25,2026-01-01,2026-07-04",
-      "default": ""
+      "info": "Format: YYYY-MM-DD. Example: 2026-12-25,2026-01-01,2026-07-04"
     },
     {
       "type": "header",

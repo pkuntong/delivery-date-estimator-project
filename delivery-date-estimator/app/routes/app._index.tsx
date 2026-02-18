@@ -1,5 +1,9 @@
-import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+import type {
+  ActionFunctionArgs,
+  HeadersFunction,
+  LoaderFunctionArgs,
+} from "react-router";
+import { Form, useActionData, useLoaderData } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import {
   PAID_PLAN_NAMES,
@@ -8,8 +12,44 @@ import {
   PLAN_PRO,
   isBillingTestMode,
 } from "../shopify.server";
+import {
+  getAnalyticsSummary,
+  getDailyMetrics,
+  getOnboardingProgress,
+  incrementDailyMetric,
+  trackAnalyticsEvent,
+  updateOnboardingProgress,
+  type OnboardingStepKey,
+} from "../db.server";
 
 type PlanKey = "free" | "pro" | "premium";
+
+const ONBOARDING_STEPS: Array<{
+  key: OnboardingStepKey;
+  label: string;
+}> = [
+  { key: "themeBlockAdded", label: "Added the app block in Theme Editor." },
+  {
+    key: "shippingConfigured",
+    label: "Configured cutoff, processing, and shipping range in app settings.",
+  },
+  {
+    key: "holidaysValidated",
+    label: "Validated holiday/weekend behavior on at least two products.",
+  },
+  { key: "mobileVerified", label: "Verified rendering and copy on mobile." },
+  { key: "billingLive", label: "Switched billing mode to live before launch." },
+];
+
+const DASHBOARD_METRIC_KEYS = [
+  "api_config_requests",
+  "settings_saved",
+  "settings_save_failed",
+  "billing_upgrade_requested",
+  "dashboard_page_views",
+  "storefront_event_widget_impression",
+  "storefront_event_ab_variant_exposed",
+] as const;
 
 function getActivePlan(subscriptionName: string | undefined): PlanKey {
   if (subscriptionName === PLAN_PREMIUM) {
@@ -19,6 +59,10 @@ function getActivePlan(subscriptionName: string | undefined): PlanKey {
     return "pro";
   }
   return "free";
+}
+
+function isOnboardingStepKey(value: string): value is OnboardingStepKey {
+  return ONBOARDING_STEPS.some((step) => step.key === value);
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -33,24 +77,102 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const activeSubscription = appSubscriptions.at(0);
   const activePlan = getActivePlan(activeSubscription?.name);
   const themeEditorUrl = `https://${session.shop}/admin/themes/current/editor?context=apps`;
+  const onboarding = await getOnboardingProgress(session.shop);
+  const completedSteps = ONBOARDING_STEPS.filter((step) => onboarding[step.key]).length;
+  const completionPercent = Math.round((completedSteps / ONBOARDING_STEPS.length) * 100);
+  const dailyMetrics = await getDailyMetrics(session.shop, [...DASHBOARD_METRIC_KEYS], 30);
+  const analyticsSummary =
+    activePlan === "premium" ? await getAnalyticsSummary(session.shop, 30) : null;
+  await incrementDailyMetric(session.shop, "dashboard_page_views");
 
   return {
     activePlan,
+    analyticsSummary,
     billingTestMode,
+    completionPercent,
+    completedSteps,
+    dailyMetrics,
+    onboarding,
     shop: session.shop,
     themeEditorUrl,
   };
 };
 
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent !== "toggle-step") {
+    return { success: false, error: "Unknown action." };
+  }
+
+  const step = formData.get("step");
+  const value = formData.get("value");
+
+  if (typeof step !== "string" || !isOnboardingStepKey(step)) {
+    return { success: false, error: "Invalid checklist step." };
+  }
+
+  if (value !== "true" && value !== "false") {
+    return { success: false, error: "Invalid checklist value." };
+  }
+
+  const checked = value === "true";
+
+  await updateOnboardingProgress(session.shop, {
+    [step]: checked,
+  });
+
+  await trackAnalyticsEvent(session.shop, "onboarding_step_toggled", {
+    step,
+    checked,
+  });
+  await incrementDailyMetric(session.shop, "onboarding_step_toggled");
+
+  return { success: true };
+};
+
 export default function Index() {
-  const { activePlan, billingTestMode, shop, themeEditorUrl } =
+  const {
+    activePlan,
+    analyticsSummary,
+    billingTestMode,
+    completionPercent,
+    completedSteps,
+    dailyMetrics,
+    onboarding,
+    shop,
+    themeEditorUrl,
+  } =
     useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+
+  const totalFor = (key: string) =>
+    dailyMetrics.totals.find((item) => item.key === key)?.total ?? 0;
+  const apiRequests30d = totalFor("api_config_requests");
+  const settingsSaves30d = totalFor("settings_saved");
+  const saveFailures30d = totalFor("settings_save_failed");
+  const upgradeIntents30d = totalFor("billing_upgrade_requested");
+  const widgetImpressions30d = totalFor("storefront_event_widget_impression");
+  const abExposures30d = totalFor("storefront_event_ab_variant_exposed");
 
   const planLabel = {
     free: "Free",
     pro: "Pro",
     premium: "Premium",
   }[activePlan];
+
+  const suggestedUpgrade =
+    activePlan === "free"
+      ? "Pro"
+      : activePlan === "pro"
+        ? "Premium"
+        : null;
+  const strongUpgradeSignal =
+    (activePlan === "free" && (apiRequests30d >= 500 || settingsSaves30d >= 10)) ||
+    (activePlan === "pro" &&
+      (apiRequests30d >= 2000 || widgetImpressions30d >= 500 || upgradeIntents30d >= 1));
 
   return (
     <s-page heading="Delivery Date Estimator">
@@ -68,7 +190,9 @@ export default function Index() {
           <s-text>{billingTestMode ? "Test" : "Live"}</s-text>
         </s-paragraph>
         <s-stack direction="inline" gap="base">
-          <s-link href="/app/billing">Manage plan</s-link>
+          <s-link href="/app/settings">Open settings</s-link>
+          <s-link href="/app/analytics">Open analytics</s-link>
+          <s-link href="/app/billing?src=dashboard_nav">Manage plan</s-link>
           <s-link href="/app/setup">Open setup guide</s-link>
           <s-link href={themeEditorUrl} target="_blank">
             Open Theme Editor
@@ -76,20 +200,105 @@ export default function Index() {
         </s-stack>
       </s-section>
 
-      <s-section heading="Launch Checklist">
+      {suggestedUpgrade && (
+        <s-section heading="Revenue Nudge">
+          <s-paragraph>
+            {strongUpgradeSignal
+              ? `Strong upsell signal detected from the last 30 days (${apiRequests30d} widget requests, ${widgetImpressions30d} widget impressions, ${settingsSaves30d} settings saves).`
+              : "Unlock higher conversion features as your traffic grows."}
+          </s-paragraph>
+          <s-paragraph>
+            Recommended next plan: <strong>{suggestedUpgrade}</strong>.
+          </s-paragraph>
+          <s-link href="/app/billing?src=dashboard_revenue_nudge">
+            {suggestedUpgrade === "Pro" ? "Upgrade to Pro" : "Upgrade to Premium"}
+          </s-link>
+        </s-section>
+      )}
+
+      {actionData?.error && (
+        <s-section>
+          <s-paragraph>{actionData.error}</s-paragraph>
+        </s-section>
+      )}
+
+      <s-section heading="Activation Checklist">
+        <s-paragraph>
+          {completedSteps}/{ONBOARDING_STEPS.length} completed ({completionPercent}%)
+        </s-paragraph>
+        {onboarding.completedAt && (
+          <s-paragraph>
+            Completed on {new Date(onboarding.completedAt).toLocaleDateString()}.
+          </s-paragraph>
+        )}
+
         <s-unordered-list>
-          <s-list-item>Add the app block in Online Store Theme Editor.</s-list-item>
-          <s-list-item>
-            Configure cutoff hour, processing days, and shipping range.
-          </s-list-item>
-          <s-list-item>
-            Confirm weekend and holiday behavior on at least two products.
-          </s-list-item>
-          <s-list-item>
-            Verify mobile rendering and checkout conversion copy.
-          </s-list-item>
-          <s-list-item>Switch billing from test mode before App Store submission.</s-list-item>
+          {ONBOARDING_STEPS.map((step) => {
+            const checked = onboarding[step.key];
+
+            return (
+              <s-list-item key={step.key}>
+                <s-stack direction="inline" gap="base">
+                  <s-text>{checked ? "✅" : "⬜️"}</s-text>
+                  <s-text>{step.label}</s-text>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="toggle-step" />
+                    <input type="hidden" name="step" value={step.key} />
+                    <input type="hidden" name="value" value={checked ? "false" : "true"} />
+                    <button type="submit">
+                      {checked ? "Mark incomplete" : "Mark complete"}
+                    </button>
+                  </Form>
+                </s-stack>
+              </s-list-item>
+            );
+          })}
         </s-unordered-list>
+      </s-section>
+
+      <s-section heading="Analytics Snapshot">
+        {activePlan === "premium" ? (
+          <>
+            <s-paragraph>
+              Last {analyticsSummary?.windowDays ?? 30} days:{" "}
+              {analyticsSummary?.totalEvents ?? 0} tracked events.
+            </s-paragraph>
+            <s-paragraph>
+              Storefront widget impressions: {widgetImpressions30d}. A/B exposures tracked:{" "}
+              {abExposures30d}.
+            </s-paragraph>
+            {analyticsSummary?.lastEventAt && (
+              <s-paragraph>
+                Last event: {new Date(analyticsSummary.lastEventAt).toLocaleString()}
+              </s-paragraph>
+            )}
+            {(analyticsSummary?.eventsByName.length ?? 0) > 0 ? (
+              <s-unordered-list>
+                {analyticsSummary?.eventsByName.slice(0, 5).map((event) => (
+                  <s-list-item key={event.name}>
+                    {event.name}: {event.count}
+                  </s-list-item>
+                ))}
+              </s-unordered-list>
+            ) : (
+              <s-paragraph>No events yet. Interact with settings and checklist first.</s-paragraph>
+            )}
+          </>
+        ) : (
+          <>
+            <s-paragraph>
+              Last 30 days preview: {apiRequests30d} requests, {settingsSaves30d} settings saves,
+              {saveFailures30d} save failures, {widgetImpressions30d} widget impressions.
+            </s-paragraph>
+            <s-paragraph>
+              Full trend breakdown, top-event analytics, and A/B experiment reporting are included
+              in the Premium plan.
+            </s-paragraph>
+            <s-link href="/app/billing?src=dashboard_analytics_snapshot">
+              Upgrade to Premium
+            </s-link>
+          </>
+        )}
       </s-section>
 
       <s-section heading="Plan Capabilities">
