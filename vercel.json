@@ -4,7 +4,7 @@
   "outputDirectory": "delivery-date-estimator/build/client",
   "functions": {
     "api/index.mjs": {
-      "includeFiles": "delivery-date-estimator/build/**"
+      "includeFiles": "delivery-date-estimator/node_modules/.prisma/**"
     }
   },
   "rewrites": [
