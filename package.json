@@ -5,8 +5,7 @@
     "dev": "cd ./delivery-date-estimator && npm run dev",
     "typecheck": "cd ./delivery-date-estimator && npm run typecheck",
     "lint": "cd ./delivery-date-estimator && npm run lint",
-    "prebuild": "npm ci --prefix ./delivery-date-estimator",
-    "build": "cd ./delivery-date-estimator && npm run build",
+    "build": "npm ci --prefix ./delivery-date-estimator && npm run build --prefix ./delivery-date-estimator",
     "deploy": "cd ./delivery-date-estimator && npm run deploy",
     "shopify": "cd ./delivery-date-estimator && npm run shopify"
   }
