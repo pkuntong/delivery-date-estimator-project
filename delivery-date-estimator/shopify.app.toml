@@ -2,7 +2,7 @@
 
 client_id = "c5e4e953d57a7feb7f01e71514876695"
 name = "delivery-date-estimator"
-application_url = "https://example.com"
+application_url = "https://delivery-date-estimator-project.vercel.app"
 embedded = true
 
 [build]
@@ -24,7 +24,7 @@ api_version = "2026-04"
 scopes = "write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://delivery-date-estimator-project.vercel.app/auth/callback", "https://delivery-date-estimator-project.vercel.app/auth/shopify/callback" ]
 
 [app_proxy]
 url = "/apps/delivery-date-estimator/config"
