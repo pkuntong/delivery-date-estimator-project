@@ -41,6 +41,9 @@ const APP_INSTALLATION_PLAN_QUERY = `#graphql
   }
 `;
 
+const PLAN_CACHE_TTL_MS = 5 * 60 * 1000;
+const planCache = new Map<string, { plan: PlanKey; expiresAt: number }>();
+
 function safeParseHolidays(raw: string | null | undefined) {
   if (!raw) return [] as string[];
 
@@ -60,9 +63,15 @@ function getPlanFromSubscriptionName(name: string | undefined): PlanKey {
   return "free";
 }
 
-async function resolvePlan(admin: unknown): Promise<PlanKey> {
+async function resolvePlan(shop: string, admin: unknown): Promise<PlanKey> {
+  const now = Date.now();
+  const cached = planCache.get(shop);
+  if (cached && cached.expiresAt > now) {
+    return cached.plan;
+  }
+
   if (!admin || typeof admin !== "object" || !("graphql" in admin)) {
-    return "free";
+    return cached?.plan ?? "free";
   }
 
   try {
@@ -82,9 +91,11 @@ async function resolvePlan(admin: unknown): Promise<PlanKey> {
       (subscription) => subscription.status?.toUpperCase() === "ACTIVE",
     );
 
-    return getPlanFromSubscriptionName(active?.name);
+    const resolved = getPlanFromSubscriptionName(active?.name);
+    planCache.set(shop, { plan: resolved, expiresAt: now + PLAN_CACHE_TTL_MS });
+    return resolved;
   } catch {
-    return "free";
+    return cached?.plan ?? "free";
   }
 }
 
@@ -180,7 +191,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   await incrementDailyMetric(shop, "api_config_requests");
   await incrementDailyMetric(shop, `api_config_source_${sourceKey}`);
 
-  const plan = await resolvePlan(admin);
+  const plan = await resolvePlan(shop, admin);
   const config = await getStoreConfig(shop);
   const publicConfig = buildPublicConfig(config, plan);
 
