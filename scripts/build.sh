@@ -12,7 +12,11 @@ npm --prefix "$APP_DIR" run prisma -- generate
 
 if [[ -n "${DATABASE_URL:-}" ]]; then
   echo "Applying Prisma migrations..."
-  npm --prefix "$APP_DIR" run prisma -- migrate deploy
+  if npm --prefix "$APP_DIR" run prisma -- migrate deploy; then
+    echo "Prisma migrations applied."
+  else
+    echo "WARNING: prisma migrate deploy failed during build; continuing deployment."
+  fi
 elif [[ "${VERCEL:-}" == "1" ]]; then
   echo "DATABASE_URL is required in Vercel build environment."
   exit 1
