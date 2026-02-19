@@ -30,7 +30,7 @@ const PLAN_DETAILS = {
     name: "Pro",
     price: "$7.99/mo",
     features: [
-      "Unlimited shipping configurations",
+      "Advanced shipping controls",
       "Full color and text customization",
       "Holiday calendar",
       "Priority support",
@@ -41,9 +41,8 @@ const PLAN_DETAILS = {
     price: "$14.99/mo",
     features: [
       "Everything in Pro",
-      "Multi-language support",
-      "A/B testing",
-      "Conversion analytics",
+      "A/B copy testing",
+      "Conversion analytics dashboard",
       "Dedicated support",
     ],
   },

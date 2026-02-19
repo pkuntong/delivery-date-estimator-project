@@ -310,15 +310,14 @@ export default function Index() {
           <s-list-item>
             <s-text>Pro ($7.99/mo): </s-text>
             <s-text>
-              Unlimited configurations, full customization, holidays, priority
+              Advanced shipping controls, full customization, holidays, priority
               support.
             </s-text>
           </s-list-item>
           <s-list-item>
             <s-text>Premium ($14.99/mo): </s-text>
             <s-text>
-              Everything in Pro plus multi-language support, A/B testing, and
-              analytics.
+              Everything in Pro plus A/B copy testing and conversion analytics.
             </s-text>
           </s-list-item>
         </s-unordered-list>

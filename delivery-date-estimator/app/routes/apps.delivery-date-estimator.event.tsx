@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { data } from "react-router";
 import { incrementDailyMetric } from "../db.server";
+import { authenticate } from "../shopify.server";
 
 const VALID_EVENTS = new Set(["widget_impression", "ab_variant_exposed"]);
 const VALID_VARIANTS = new Set(["a", "b"]);
@@ -16,8 +17,9 @@ export async function loader() {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  const { session } = await authenticate.public.appProxy(request);
   const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  const shop = session?.shop ?? url.searchParams.get("shop");
   const source = sanitizeSource(url.searchParams.get("source"));
 
   if (!shop) {

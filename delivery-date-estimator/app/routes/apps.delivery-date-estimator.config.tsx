@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { data } from "react-router";
 import { getStoreConfig, incrementDailyMetric } from "../db.server";
+import { authenticate } from "../shopify.server";
 
 const DEFAULT_CONFIG = {
   cutoffHour: 14,
@@ -41,8 +42,9 @@ function safeParseHolidays(raw: string | null | undefined) {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const { session } = await authenticate.public.appProxy(request);
   const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  const shop = session?.shop ?? url.searchParams.get("shop");
   const source = (url.searchParams.get("source") || "app_proxy").toLowerCase();
 
   if (!shop) {

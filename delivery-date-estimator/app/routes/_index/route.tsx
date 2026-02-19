@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
+import { Link, redirect, Form, useLoaderData } from "react-router";
 
 import { login } from "../../shopify.server";
 
@@ -12,11 +12,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return {
+    showForm: Boolean(login),
+    supportEmail:
+      process.env.SUPPORT_EMAIL || "support@deliverydateestimator.app",
+  };
 };
 
 export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
+  const { showForm, supportEmail } = useLoaderData<typeof loader>();
 
   return (
     <div className={styles.index}>
@@ -52,6 +56,14 @@ export default function App() {
             Editor with no custom theme code.
           </li>
         </ul>
+        <p className={styles.meta}>
+          Support:{" "}
+          <a href={`mailto:${supportEmail}`}>
+            {supportEmail}
+          </a>{" "}
+          | <Link to="/privacy-policy">Privacy Policy</Link> |{" "}
+          <Link to="/terms-of-service">Terms of Service</Link>
+        </p>
       </div>
     </div>
   );

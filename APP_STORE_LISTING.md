@@ -86,7 +86,7 @@ estimated shipping, order cutoff, shipping widget
 - Standard customization
 
 **Pro — $7.99/month**
-- Unlimited shipping configurations
+- Advanced shipping controls
 - Full color & text customization
 - Holiday calendar
 - All icon styles
@@ -94,9 +94,8 @@ estimated shipping, order cutoff, shipping widget
 
 **Premium — $14.99/month**  
 - Everything in Pro
-- Multi-language support
-- A/B testing
-- Conversion analytics
+- A/B copy testing
+- Conversion analytics dashboard
 - Dedicated support
 
 ---
