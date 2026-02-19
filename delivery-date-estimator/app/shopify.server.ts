@@ -14,7 +14,13 @@ export const PLAN_PRO = "Pro";
 export const PLAN_PREMIUM = "Premium";
 export const PAID_PLAN_NAMES = [PLAN_PRO, PLAN_PREMIUM] as const;
 
-const BILLING_TEST_MODE = process.env.SHOPIFY_BILLING_TEST_MODE !== "false";
+// Default to test mode outside production; default to live in production.
+const BILLING_TEST_MODE = process.env.SHOPIFY_BILLING_TEST_MODE
+  ? process.env.SHOPIFY_BILLING_TEST_MODE !== "false"
+  : process.env.NODE_ENV !== "production";
+
+// Keep scopes least-privilege for this app's current feature set.
+const APP_SCOPES = ["read_products"];
 
 export function isBillingTestMode() {
   return BILLING_TEST_MODE;
@@ -50,7 +56,7 @@ const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
   apiVersion: ApiVersion.October25,
-  scopes: process.env.SCOPES?.split(","),
+  scopes: APP_SCOPES,
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),

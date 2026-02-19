@@ -1,42 +1,66 @@
 # Deployment & App Store Submission Guide
 
-## Phase 1: Deploy Your App Server
+## Production Architecture (Current)
 
-Your Shopify app needs to be hosted somewhere. 
-Easiest option: **Railway.app** (free tier available, ~$5/month after).
+- App host: Vercel
+- Production URL: `https://delivery-date-estimator-project.vercel.app`
+- Shopify app config: `delivery-date-estimator/shopify.app.toml`
+- Database: Prisma (currently SQLite; migrate to managed Postgres before App Store scale)
 
-### Deploy to Railway
+## Phase 1: Deploy App Server on Vercel
 
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login
-railway login
-
-# Initialize project (run from your app's root folder)
-railway init
-
-# Add a Postgres database
-railway add --plugin postgresql
-
-# Deploy
-railway up
-```
-
-After deploying, Railway gives you a URL like: `https://delivery-date-estimator.up.railway.app`
-
-### Update Shopify with your production URL
+From repository root:
 
 ```bash
-shopify app config set --app-url https://YOUR-RAILWAY-URL.up.railway.app
+npm run build
+vercel --prod
 ```
 
-Or manually update `shopify.app.toml`:
-```toml
-[app]
-application_url = "https://YOUR-RAILWAY-URL.up.railway.app"
+Verify:
+
+```bash
+curl -I https://delivery-date-estimator-project.vercel.app
 ```
+
+Expected: `HTTP/2 200`
+
+### Required Vercel environment variables
+
+Set these on Production:
+
+- `SHOPIFY_API_KEY`
+- `SHOPIFY_API_SECRET`
+- `SHOPIFY_APP_URL=https://delivery-date-estimator-project.vercel.app`
+
+Optional overrides:
+
+- `SHOPIFY_BILLING_TEST_MODE=false` (force live billing mode explicitly)
+
+### Sync Shopify app configuration
+
+From `delivery-date-estimator/`:
+
+```bash
+npm run deploy -- --force
+```
+
+This pushes `shopify.app.toml` settings (URL, redirects, scopes, webhooks, app proxy).
+
+Note:
+
+- Runtime scopes are fixed to least-privilege `read_products` in code.
+- Billing mode defaults to test outside production and live in production.
+
+## Phase 1.5: Database Upgrade (Required)
+
+Before public App Store scale, move from SQLite to managed Postgres:
+
+1. Provision Postgres (Neon, Supabase, Railway, or other managed service).
+2. Set `DATABASE_URL` in Vercel Production.
+3. Update Prisma datasource provider to `postgresql`.
+4. Run migrations against Postgres.
+
+This prevents session/config data loss on serverless instances.
 
 ---
 
@@ -70,11 +94,12 @@ Go to: https://partners.shopify.com → Apps → Your App → Distribution
    - Use Figma or Canva to make one quickly
 
 5. **Privacy policy URL:**
-   - Host the `privacy-policy.html` file somewhere public
-   - Easy option: Create a GitHub Pages site or use your Railway deployment
-   - Paste the URL in the listing
+   - Use: `https://delivery-date-estimator-project.vercel.app/privacy-policy`
 
-6. **Pricing:**
+6. **Terms of service URL:**
+   - Use: `https://delivery-date-estimator-project.vercel.app/terms-of-service`
+
+7. **Pricing:**
    - Set up Free, Pro ($7.99), and Premium ($14.99) plans
    - Make sure billing config is in your `shopify.app.toml`
 
@@ -96,8 +121,9 @@ Before hitting "Submit for Review":
 - [ ] At least 3 screenshots uploaded
 - [ ] All listing text filled in
 - [ ] Support email is set and working
-- [ ] `isTest: true` changed to `isTest: false` in billing code
-- [ ] `test = true` changed to `test = false` in shopify.app.toml
+- [ ] `SHOPIFY_BILLING_TEST_MODE=false` set in Vercel Production
+- [ ] Scope set to least privilege (`read_products`)
+- [ ] Managed Postgres configured for production
 
 ---
 
@@ -140,7 +166,7 @@ Shopify may request changes — respond quickly to stay in the queue.
 
 ### Ongoing
 - Ship updates regularly (shows activity in the app store)
-- Keep adding value: more icons, more languages, analytics
+- Keep adding value: better onboarding, smarter date rules, deeper analytics
 - Good reviews compound — each one brings more installs
 
 ---
@@ -151,5 +177,5 @@ Shopify may request changes — respond quickly to stay in the queue.
 - App Store listing requirements: https://shopify.dev/docs/apps/store/requirements
 - Billing API docs: https://shopify.dev/docs/apps/billing
 - Theme Extensions docs: https://shopify.dev/docs/apps/build/online-store/theme-app-extensions
-- Railway deployment: https://railway.app
+- Vercel docs: https://vercel.com/docs
 - Shopify CLI reference: https://shopify.dev/docs/apps/tools/cli
