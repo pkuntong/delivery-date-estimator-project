@@ -5,7 +5,7 @@
 - App host: Vercel
 - Production URL: `https://delivery-date-estimator-project.vercel.app`
 - Shopify app config: `delivery-date-estimator/shopify.app.toml`
-- Database: Prisma (currently SQLite; migrate to managed Postgres before App Store scale)
+- Database: Prisma on managed PostgreSQL (`DATABASE_URL`)
 
 ## Phase 1: Deploy App Server on Vercel
 
@@ -52,16 +52,14 @@ Note:
 - Runtime scopes are fixed to least-privilege `read_products` in code.
 - Billing mode defaults to test outside production and live in production.
 
-## Phase 1.5: Database Upgrade (Required)
+## Phase 1.5: Database Validation (Required)
 
-Before public App Store scale, move from SQLite to managed Postgres:
+Before App Store submission, confirm production database wiring is healthy:
 
-1. Provision Postgres (Neon, Supabase, Railway, or other managed service).
-2. Set `DATABASE_URL` in Vercel Production.
-3. Update Prisma datasource provider to `postgresql`.
-4. Run migrations against Postgres.
-
-This prevents session/config data loss on serverless instances.
+1. `DATABASE_URL` exists in Vercel Production.
+2. Prisma datasource in `delivery-date-estimator/prisma/schema.prisma` is `postgresql`.
+3. Root build script runs `prisma migrate deploy` when `DATABASE_URL` is present.
+4. Deploy succeeds and app pages load with HTTP 200.
 
 ---
 
@@ -124,7 +122,7 @@ Before hitting "Submit for Review":
 - [ ] Support email is set and working
 - [ ] `SHOPIFY_BILLING_TEST_MODE=false` set in Vercel Production
 - [ ] Scope set to least privilege (`read_products`)
-- [ ] Managed Postgres configured for production
+- [ ] Managed Postgres configured and Prisma migrations deploy during build
 
 ---
 

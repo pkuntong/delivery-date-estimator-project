@@ -1,6 +1,6 @@
 # Postgres Cutover Runbook
 
-This project currently runs Prisma on SQLite. For durable production on serverless, migrate to managed Postgres.
+This runbook is for resetting Prisma migrations to a PostgreSQL baseline when needed.
 
 ## Prerequisites
 

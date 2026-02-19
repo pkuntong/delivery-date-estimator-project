@@ -22,11 +22,25 @@ check_file "$APP_DIR/app/routes/terms-of-service.tsx" "Terms route exists"
 check_file "$APP_DIR/app/routes/api.health.tsx" "Health endpoint exists"
 check_file "$ROOT_DIR/POSTGRES_CUTOVER.md" "Postgres cutover runbook exists"
 check_file "$ROOT_DIR/scripts/cutover-postgres.sh" "Postgres cutover script exists"
+check_file "$ROOT_DIR/scripts/build.sh" "Build script exists"
 
 if grep -q 'scopes = "read_products"' "$APP_DIR/shopify.app.toml"; then
   pass "Shopify scope is least-privilege (read_products)"
 else
   fail "Shopify scope is not read_products"
+fi
+
+if grep -q 'provider = "postgresql"' "$APP_DIR/prisma/schema.prisma" && \
+   grep -q 'env("DATABASE_URL")' "$APP_DIR/prisma/schema.prisma"; then
+  pass "Prisma datasource is PostgreSQL with DATABASE_URL"
+else
+  fail "Prisma datasource is not configured for PostgreSQL + DATABASE_URL"
+fi
+
+if grep -q 'prisma -- migrate deploy' "$ROOT_DIR/scripts/build.sh"; then
+  pass "Build pipeline applies Prisma migrations"
+else
+  fail "Build pipeline does not apply Prisma migrations"
 fi
 
 if grep -q "authenticate.public.appProxy" "$APP_DIR/app/routes/apps.delivery-date-estimator.config.tsx"; then
