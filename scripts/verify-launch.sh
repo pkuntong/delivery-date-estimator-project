@@ -51,6 +51,12 @@ else
   fail "App proxy config route is missing app proxy auth"
 fi
 
+if grep -q "currentAppInstallation" "$APP_DIR/app/routes/apps.delivery-date-estimator.config.tsx"; then
+  pass "App proxy config route resolves active billing plan"
+else
+  fail "App proxy config route does not resolve active billing plan"
+fi
+
 if grep -q "authenticate.public.appProxy" "$APP_DIR/app/routes/apps.delivery-date-estimator.event.tsx"; then
   pass "App proxy event route validates Shopify signature"
 else
