@@ -12,6 +12,7 @@
 From repository root:
 
 ```bash
+npm run verify:launch
 npm run build
 vercel --prod
 ```

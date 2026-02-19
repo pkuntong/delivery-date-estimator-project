@@ -341,6 +341,11 @@ export default function Index() {
               Theme app extension docs
             </s-link>
           </s-list-item>
+          <s-list-item>
+            <s-link href="/api/health" target="_blank">
+              Health check endpoint
+            </s-link>
+          </s-list-item>
         </s-unordered-list>
       </s-section>
     </s-page>

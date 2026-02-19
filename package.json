@@ -6,6 +6,7 @@
     "typecheck": "cd ./delivery-date-estimator && npm run typecheck",
     "lint": "cd ./delivery-date-estimator && npm run lint",
     "build": "npm ci --prefix ./delivery-date-estimator && npm --prefix ./delivery-date-estimator run prisma -- generate && npm run build --prefix ./delivery-date-estimator",
+    "verify:launch": "bash ./scripts/verify-launch.sh",
     "deploy": "cd ./delivery-date-estimator && npm run deploy",
     "shopify": "cd ./delivery-date-estimator && npm run shopify"
   }

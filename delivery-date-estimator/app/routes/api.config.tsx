@@ -1,17 +1,30 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { data } from "react-router";
 import { getStoreConfig, incrementDailyMetric } from "../db.server";
+import { authenticate } from "../shopify.server";
+
+function safeParseHolidays(raw: string | null | undefined) {
+  if (!raw) return [] as string[];
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 // Public API endpoint for theme extension
-// No auth required — theme extensions can't authenticate
+// This endpoint is for authenticated app admin contexts.
+// Storefront theme extension traffic should use the signed app proxy endpoint:
+// /apps/delivery-date-estimator/config
 export async function loader({ request }: LoaderFunctionArgs) {
+  const { session } = await authenticate.admin(request);
   const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+  const shop = session.shop;
   const source = (url.searchParams.get("source") || "unknown").toLowerCase();
-
-  if (!shop) {
-    return data({ error: "Missing shop parameter" }, { status: 400 });
-  }
 
   await incrementDailyMetric(shop, "api_config_requests");
   const sourceKey = source.replace(/[^a-z0-9_]/g, "") || "unknown";
@@ -55,7 +68,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     shippingDaysMax: config.shippingDaysMax,
     excludeWeekends: config.excludeWeekends,
     timezone: config.timezone,
-    holidays: JSON.parse(config.holidays || "[]"),
+    holidays: safeParseHolidays(config.holidays),
     showCountdown: config.showCountdown,
     labelText: config.labelText,
     countdownText: config.countdownText,
