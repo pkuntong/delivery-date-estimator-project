@@ -277,3 +277,13 @@ export async function getMetricTotalsByPrefix(
     .sort((a, b) => b.total - a.total)
     .slice(0, limit);
 }
+
+export async function purgeShopData(shop: string) {
+  return prisma.$transaction([
+    prisma.dailyMetric.deleteMany({ where: { shop } }),
+    prisma.analyticsEvent.deleteMany({ where: { shop } }),
+    prisma.onboardingProgress.deleteMany({ where: { shop } }),
+    prisma.storeConfig.deleteMany({ where: { shop } }),
+    prisma.session.deleteMany({ where: { shop } }),
+  ]);
+}
