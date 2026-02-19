@@ -21,6 +21,7 @@ Verify:
 
 ```bash
 curl -I https://delivery-date-estimator-project.vercel.app
+npm run verify:production
 ```
 
 Expected: `HTTP/2 200`

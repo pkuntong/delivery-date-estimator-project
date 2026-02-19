@@ -20,9 +20,11 @@ echo "Running launch verification..."
 check_file "$APP_DIR/app/routes/privacy-policy.tsx" "Privacy policy route exists"
 check_file "$APP_DIR/app/routes/terms-of-service.tsx" "Terms route exists"
 check_file "$APP_DIR/app/routes/api.health.tsx" "Health endpoint exists"
+check_file "$APP_DIR/app/routes/readyz.tsx" "Public readiness endpoint exists"
 check_file "$ROOT_DIR/POSTGRES_CUTOVER.md" "Postgres cutover runbook exists"
 check_file "$ROOT_DIR/scripts/cutover-postgres.sh" "Postgres cutover script exists"
 check_file "$ROOT_DIR/scripts/build.sh" "Build script exists"
+check_file "$ROOT_DIR/scripts/verify-production.sh" "Production verification script exists"
 
 if grep -q 'scopes = "read_products"' "$APP_DIR/shopify.app.toml"; then
   pass "Shopify scope is least-privilege (read_products)"
