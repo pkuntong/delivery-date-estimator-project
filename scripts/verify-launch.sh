@@ -20,6 +20,8 @@ echo "Running launch verification..."
 check_file "$APP_DIR/app/routes/privacy-policy.tsx" "Privacy policy route exists"
 check_file "$APP_DIR/app/routes/terms-of-service.tsx" "Terms route exists"
 check_file "$APP_DIR/app/routes/api.health.tsx" "Health endpoint exists"
+check_file "$ROOT_DIR/POSTGRES_CUTOVER.md" "Postgres cutover runbook exists"
+check_file "$ROOT_DIR/scripts/cutover-postgres.sh" "Postgres cutover script exists"
 
 if grep -q 'scopes = "read_products"' "$APP_DIR/shopify.app.toml"; then
   pass "Shopify scope is least-privilege (read_products)"
@@ -43,6 +45,31 @@ if grep -q "purgeShopData" "$APP_DIR/app/routes/webhooks.app.uninstalled.tsx"; t
   pass "Uninstall webhook purges tenant data"
 else
   fail "Uninstall webhook does not purge tenant data"
+fi
+
+if grep -q "authenticate.admin" "$APP_DIR/app/routes/api.config.tsx"; then
+  pass "Internal /api/config route is admin-authenticated"
+else
+  fail "Internal /api/config route is missing admin auth"
+fi
+
+if grep -q "support@deliverydateestimator.app" "$ROOT_DIR/APP_STORE_LISTING.md"; then
+  pass "App listing support email is set"
+else
+  fail "App listing support email is not set"
+fi
+
+if grep -q "https://delivery-date-estimator-project.vercel.app" "$ROOT_DIR/APP_STORE_LISTING.md"; then
+  pass "App listing website URL is set"
+else
+  fail "App listing website URL is not set"
+fi
+
+if grep -qF "[your-email@domain.com]" "$ROOT_DIR/APP_STORE_LISTING.md" || \
+   grep -qF "[your-website.com]" "$ROOT_DIR/APP_STORE_LISTING.md"; then
+  fail "App listing still contains placeholder support fields"
+else
+  pass "App listing support placeholders removed"
 fi
 
 echo "Running production build check..."

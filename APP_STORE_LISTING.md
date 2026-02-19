@@ -102,6 +102,8 @@ estimated shipping, order cutoff, shipping widget
 
 ## Support Info
 
-Email: [your-email@domain.com]
-Website: [your-website.com]
+Email: support@deliverydateestimator.app
+Website: https://delivery-date-estimator-project.vercel.app
+Privacy policy: https://delivery-date-estimator-project.vercel.app/privacy-policy
+Terms of service: https://delivery-date-estimator-project.vercel.app/terms-of-service
 Response time: Within 24 hours
