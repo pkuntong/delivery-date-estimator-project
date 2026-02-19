@@ -1,6 +1,3 @@
--- CreateSchema
-CREATE SCHEMA IF NOT EXISTS "public";
-
 -- CreateTable
 CREATE TABLE "Session" (
     "id" TEXT NOT NULL,
@@ -123,4 +120,3 @@ CREATE UNIQUE INDEX "DailyMetric_shop_key_date_key" ON "DailyMetric"("shop", "ke
 
 -- AddForeignKey
 ALTER TABLE "StoreConfig" ADD CONSTRAINT "StoreConfig_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "Session"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
